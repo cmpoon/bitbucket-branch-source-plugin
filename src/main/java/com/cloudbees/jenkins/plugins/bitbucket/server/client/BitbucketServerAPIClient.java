@@ -31,11 +31,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.httpclient.UsernamePasswordCredentials;
 import org.apache.commons.httpclient.auth.AuthScope;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -368,9 +371,17 @@ public class BitbucketServerAPIClient implements BitbucketApi {
     }
 
     private String getRequest(String path) {
-        HttpClient client = getHttpClient();
-        client.getState().setCredentials(AuthScope.ANY, credentials);
+    	HttpClient client = getHttpClient("");
         GetMethod httpget = new GetMethod(this.baseURL + path);
+    	try{
+	    	URI uri = new URI(this.baseURL + path, false);
+	        client = getHttpClient(uri.getHost());
+	        //httpget = new GetMethod(uri.getURI());
+    	}catch (URIException e){
+			LOGGER.warning("Request URI malformed: " + this.baseURL + path + " - " + e.getMessage());
+    		
+    	}
+        client.getState().setCredentials(AuthScope.ANY, credentials);
         client.getParams().setAuthenticationPreemptive(true);
         String response = null;
         InputStream responseBodyAsStream = null;
@@ -397,35 +408,56 @@ public class BitbucketServerAPIClient implements BitbucketApi {
         return response;
     }
 
-    private HttpClient getHttpClient() {
-        HttpClient client = new HttpClient();
+	private HttpClient getHttpClient(String host) {
+		HttpClient client = new HttpClient();
 
-        client.getParams().setConnectionManagerTimeout(10 * 1000);
-        client.getParams().setSoTimeout(60 * 1000);
+		client.getParams().setConnectionManagerTimeout(10 * 1000);
+		client.getParams().setSoTimeout(60 * 1000);
 
-        Jenkins jenkins = Jenkins.getInstance();
-        ProxyConfiguration proxy = null;
-        if (jenkins != null) {
-            proxy = jenkins.proxy;
-        }
-        if (proxy != null) {
-            LOGGER.info("Jenkins proxy: " + proxy.name + ":" + proxy.port);
-            client.getHostConfiguration().setProxy(proxy.name, proxy.port);
-            String username = proxy.getUserName();
-            String password = proxy.getPassword();
-            if (username != null && !"".equals(username.trim())) {
-                LOGGER.info("Using proxy authentication (user=" + username + ")");
-                client.getState().setProxyCredentials(AuthScope.ANY,
-                    new UsernamePasswordCredentials(username, password));
-            }
-        }
-        return client;
-    }
+		Jenkins jenkins = Jenkins.getInstance();
+		ProxyConfiguration proxy = null;
+		if (jenkins != null) {
+			proxy = jenkins.proxy;
+		}
+		if (proxy != null) {
+			LOGGER.info("Jenkins proxy: " + proxy.name + ":" + proxy.port);
+
+			boolean shouldProxy = true;
+			for (Pattern p : proxy.getNoProxyHostPatterns()) {
+				if (p.matcher(host).matches()) {
+					shouldProxy = false;
+					break;
+				}
+			}
+			
+			if (shouldProxy) {
+				client.getHostConfiguration().setProxy(proxy.name, proxy.port);
+				String username = proxy.getUserName();
+				String password = proxy.getPassword();
+				if (username != null && !"".equals(username.trim())) {
+					LOGGER.info("Using proxy authentication (user=" + username + ")");
+					client.getState().setProxyCredentials(AuthScope.ANY,
+							new UsernamePasswordCredentials(username, password));
+				}
+			}else{
+				LOGGER.info("-- No proxy matched. Proxy not used.");
+			}
+
+		}
+		return client;
+	}
 
     private int getRequestStatus(String path) {
-        HttpClient client = getHttpClient();
-        client.getState().setCredentials(AuthScope.ANY, credentials);
+    	HttpClient client = getHttpClient("");
         GetMethod httpget = new GetMethod(this.baseURL + path);
+    	try{
+	    	URI uri = new URI(this.baseURL + path, false);
+	        client = getHttpClient(uri.getHost());
+	        // httpget = new GetMethod(uri.getURI());
+    	}catch (URIException e){
+			LOGGER.warning("Request URI malformed: " + this.baseURL + path + " - " + e.getMessage());
+    	}
+        client.getState().setCredentials(AuthScope.ANY, credentials);
         client.getParams().setAuthenticationPreemptive(true);
         try {
             client.executeMethod(httpget);
@@ -466,7 +498,12 @@ public class BitbucketServerAPIClient implements BitbucketApi {
     }
 
     private String postRequest(PostMethod httppost) throws UnsupportedEncodingException {
-        HttpClient client = getHttpClient();
+        HttpClient client = getHttpClient("");
+        try{
+        	client = getHttpClient(httppost.getURI().getHost());
+        }catch (URIException e){
+			LOGGER.warning("POST Request URI malformed: - " + e.getMessage());
+    	}
         client.getState().setCredentials(AuthScope.ANY, credentials);
         client.getParams().setAuthenticationPreemptive(true);
         String response = null;

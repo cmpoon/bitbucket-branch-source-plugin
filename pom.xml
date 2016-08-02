@@ -32,12 +32,12 @@
     </parent>
 
     <artifactId>cloudbees-bitbucket-branch-source</artifactId>
-    <version>1.6-SNAPSHOT</version>
+    <version>1.6.1-CMPoon</version>
     <packaging>hpi</packaging>
 
-    <name>Bitbucket Branch Source Plugin</name>
+    <name>Bitbucket Branch Source Plugin (Custom)</name>
     <url>https://wiki.jenkins-ci.org/display/JENKINS/Bitbucket+Branch+Source+Plugin</url>
-    <description>Discover and build Bitbucket Cloud and Bitbucket Server pull requests and branches and send status notifications with the build result.</description>
+    <description>Discover and build Bitbucket Cloud and Bitbucket Server pull requests and branches and send status notifications with the build result. Modified to respect No-Proxy settings. --cmpoon</description>
     <licenses>
         <license>
             <name>MIT License</name>
